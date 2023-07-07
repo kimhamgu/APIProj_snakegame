@@ -3,6 +3,12 @@
 
 #include "framework.h"
 #include "snakeGame.h"
+#include <iostream>
+#include <time.h>
+#include <Windows.h>
+#include <vector>
+
+using namespace std;
 
 #define MAX_LOADSTRING 100
 
@@ -11,16 +17,25 @@ HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
 WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
 
-static POINT center_up = { 10,10 };
-static POINT center_down = { 10,411 };
-static POINT center_left = { 10,10 };
-static POINT center_right = { 450,10 };
+vector<int> snake[100]; //0으로 초기화된 100개의 원소를 가진 벡터가 원소인 배열snake를 생성
 
 static POINT snakeCenter;
+static POINT snakeArr[100];
+static int snakeLength = 5;
 
 void Snake(HDC hdc, int length);
-void Draw_Circle(HDC hdc);
+void Draw_Circle(HDC hdc, int i);
 void Update();
+
+#ifdef UNICODE
+
+#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
+
+#else
+
+#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
+
+#endif
 
 // 이 코드 모듈에 포함된 함수의 선언을 전달합니다:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -90,8 +105,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int)msg.wParam;
 }
 
-
-
 //
 //  함수: MyRegisterClass()
 //
@@ -158,15 +171,19 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {    
+    static int num = 0;
+    static int direction;
+
     switch (message)
     {
     case WM_CREATE:
         {
-            snakeCenter = { 30,30 };
+            for (int i = 0; i < snakeLength; i++)
+            {
+                snakeArr[i] = { 30,30 };
+            }           
         }
         break;
-
-        
 
     case WM_COMMAND:
         {
@@ -188,26 +205,82 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_KEYDOWN:
         {
-            Update();
+            //Update();      
+            SetTimer(hWnd, 1, 70, NULL);
 
-          /*  if (wParam == VK_RIGHT)
-            {
-                snakeCenter.x += 5;
+            if (wParam == VK_RIGHT)
+            {                                                           
+                num = 1;                                         
             }
             if (wParam == VK_LEFT)
             {
-                snakeCenter.x -= 5;
+                num = 2;
             }
             if (wParam == VK_UP)
             {
-                snakeCenter.y -= 5;
+                num = 3;
             }
             if (wParam == VK_DOWN)
             {
-                snakeCenter.y += 5;
-            }*/
+                num = 4;
+            }
             
            InvalidateRgn(hWnd, NULL, FALSE);//새 이벤트 불러오기
+        }
+        break;
+
+    case WM_TIMER:
+        {
+        switch (num)
+        {
+            case 1:
+            {
+                for (int i = 0; i < snakeLength; i++)
+                {
+                    snakeArr[i].x += 10;
+                    snakeArr[i + 1].x += 20;
+                }
+            
+            }
+            break;
+
+            case 2:
+            {
+                for (int i = 0; i < snakeLength; i++)
+                {
+                    snakeArr[i].x -= 10;
+                    snakeArr[i + 1].x -= 20;
+                }
+            
+            }
+            break;
+
+            case 3:
+            {   
+                for (int i = 0; i < snakeLength; i++)
+                {
+                    snakeArr[i].y -= 10;
+                    snakeArr[i + 1].y -= 20;
+                }
+            
+            }
+            break;
+
+            case 4:
+            {   
+                for (int i = 0; i < snakeLength; i++)
+                {
+                    snakeArr[i].y += 10;
+                    snakeArr[i + 1].y += 20;
+                }
+            
+            }
+            break;
+            }
+
+                //InvalidateRgn(hWnd, NULL, FALSE);//새 이벤트 불러오기
+            
+                InvalidateRgn(hWnd, NULL, true);//새 이벤트 불러오기
         }
         break;
 
@@ -222,6 +295,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
+        
+            POINT center_up = { 10,10 };
+            POINT center_down = { 10,411 };
+            POINT center_left = { 10,10 };
+            POINT center_right = { 450,10 };
 
             for (int i = 0; i < 25; i++)
             {
@@ -242,16 +320,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 Rectangle(hdc, center_right.x - 10, center_right.y - 10, center_right.x + 10, center_right.y + 10);
                 center_right.y += 20;
-            }            
+            }      
 
-            Snake(hdc, 2);
-            
-     
+            Snake(hdc, 5);
+
+            //InvalidateRgn(hWnd, NULL, false);//새 이벤트 불러오기
+                                   
             EndPaint(hWnd, &ps);
         }
         break;
     case WM_DESTROY:
         PostQuitMessage(0);
+        KillTimer(hWnd, 1);
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
@@ -292,25 +372,39 @@ void Update()
     // WM_keydown, WM_keyup -> 입력 키를 둔감하게 받을 때.
 
     // 키 입력 받는게 예민하게 받을 때.
-    if (GetKeyState('A') & 0x41)
-    {
-        snakeCenter.x -= 10;
-    }
+   
+        if (GetKeyState('A') & 0x8000)
+        {       
+            for (int i = 0; i < 50; i++)
+            {
+                snakeCenter.x -= 10;
 
-    if (GetKeyState('D') & 0x44)
-    {
-        snakeCenter.x += 10;
-    }
+                cout << snakeCenter.x;
+            }
+           
+        }
 
-    if (GetKeyState('S') & 0x53)
-    {
-        snakeCenter.y += 10;
-    }
+        if (GetKeyState('D') & 0x8000)
+        {
+            snakeCenter.x += 10;
 
-    if (GetKeyState('W') & 0x57)
-    {
-        snakeCenter.y -= 10;
-    }
+            for (int i = 0; i < 50; i++)
+            {
+                snakeCenter.x += 10;
+
+                cout << snakeCenter.x << " ";
+            }
+        }
+
+        if (GetKeyState('S') & 0x8000)
+        {
+            snakeCenter.y += 10;
+        }
+
+        if (GetKeyState('W') & 0x8000)
+        {
+            snakeCenter.y -= 10;
+        }
 }
 
 void Snake(HDC hdc, int length)
@@ -326,8 +420,10 @@ void Snake(HDC hdc, int length)
         {
             SelectObject(hdc, CreateSolidBrush(RGB(0, 255, 0)));
             //이후 그리는 몸은 녹색
+
+            cout << i << "개 ";
         }
-        Draw_Circle(hdc);
+        Draw_Circle(hdc, i);
     }
 
     /*SelectObject(hdc, CreateSolidBrush(RGB(255, 0, 0)));
@@ -336,8 +432,8 @@ void Snake(HDC hdc, int length)
     Ellipse(hdc, x2 - 10, y2 - 10, x2 + 10, y2 + 10);*/
 }
 
-void Draw_Circle(HDC hdc)
+void Draw_Circle(HDC hdc, int i)
 {
-    Ellipse(hdc, snakeCenter.x - 10, snakeCenter.y - 10, snakeCenter.x + 10, snakeCenter.y + 10);
+    Ellipse(hdc, snakeArr[i].x - 10, snakeArr[i].y - 10, snakeArr[i].x + 10, snakeArr[i].y + 10);
 }
 

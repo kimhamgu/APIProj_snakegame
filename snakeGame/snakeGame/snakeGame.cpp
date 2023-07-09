@@ -17,15 +17,21 @@ HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
 WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
 
-vector<int> snake[100]; //0으로 초기화된 100개의 원소를 가진 벡터가 원소인 배열snake를 생성
+//vector<int> snake[100]; //0으로 초기화된 100개의 원소를 가진 벡터가 원소인 배열snake를 생성
 
 static POINT snakeCenter;
 static POINT snakeArr[100];
 static int snakeLength = 5;
 
-void Snake(HDC hdc, int length);
+//void Snake(HDC hdc, int length);
 void Draw_Circle(HDC hdc, int i);
-void Update();
+//void Update();
+
+void Init(HWND hWnd, int size);
+//void Outline(HWND hWnd, HDC hdc, RECT rect, int size);
+void Snake(HDC hdc, int* x, int* y, int length);
+void Food_Place(HWND hWnd, RECT rect, int* fx, int* fy);
+void Food_Draw(HDC hdc, int* fx, int* fy);
 
 #ifdef UNICODE
 
@@ -173,15 +179,42 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {    
     static int num = 0;
     static int direction;
+    static UINT checkCollision = 0;
+    
+    enum { zero, Wall };
+
+
+    PAINTSTRUCT ps;
+    HDC hdc;
+
+    static int width[100] = { 50, 70, 90, 110, 130 };
+    static int height[100] = { 50, 50, 50, 50, 50 };
+    //뱀의 시작위치
+
+    static int length = 4;
+    //뱀의 길이
+
+    static int fx = 30;
+    static int fy = 30;
+    //먹이의 위치
+
+    static RECT rect;
+    //맵의 영역
+
+    static int size;
+    //맵테두리 사각형길이의 반
 
     switch (message)
     {
     case WM_CREATE:
         {
-            for (int i = 0; i < snakeLength; i++)
-            {
-                snakeArr[i] = { 30,30 };
-            }           
+            size = 10;
+
+            GetClientRect(hWnd, &rect);
+
+            Init(hWnd, size);
+
+            break;
         }
         break;
 
@@ -204,83 +237,178 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_KEYDOWN:
-        {
-            //Update();      
-            SetTimer(hWnd, 1, 70, NULL);
-
-            if (wParam == VK_RIGHT)
-            {                                                           
-                num = 1;                                         
-            }
-            if (wParam == VK_LEFT)
-            {
-                num = 2;
-            }
-            if (wParam == VK_UP)
-            {
-                num = 3;
-            }
-            if (wParam == VK_DOWN)
-            {
-                num = 4;
-            }
+        {           
+            SetTimer(hWnd, 1, 80, NULL);            
             
-           InvalidateRgn(hWnd, NULL, FALSE);//새 이벤트 불러오기
+            if (wParam == VK_UP) 
+            {
+                
+                if (num != 2)
+                {
+                    num = 1;
+                }                 
+            }
+            else if (wParam == VK_DOWN) 
+            {
+                if (num != 1)
+                {
+                    num = 2;
+                }             
+            }
+            else if (wParam == VK_LEFT) 
+            {
+                if (num != 4)
+                {
+                    num = 3;
+                }              
+            }
+            else if (wParam == VK_RIGHT) 
+            {            
+                if (num != 3)
+                {
+                    num = 4;
+                }                    
+            }          
+
+          
+
+            InvalidateRgn(hWnd, NULL, FALSE);//새 이벤트 불러오기
         }
         break;
 
     case WM_TIMER:
+    {
+        switch (wParam)
         {
-        switch (num)
-        {
-            case 1:
+            case 1: //1번 타이머.
             {
-                for (int i = 0; i < snakeLength; i++)
+                switch (num)
                 {
-                    snakeArr[i].x += 10;
-                    snakeArr[i + 1].x += 20;
+                case 1:
+                {
+                    for (int i = 0; i < length; i++)
+                    {
+                        width[length - i] = width[length - i - 1];
+                        height[length - i] = height[length - i - 1];
+                    }
+
+                    height[0] -= 20;
+
                 }
-            
+                break;
+
+                case 2:
+                {
+                    for (int i = 0; i < length; i++)
+                    {
+                        width[length - i] = width[length - i - 1];
+                        height[length - i] = height[length - i - 1];
+                    }
+
+                    height[0] += 20;
+
+                }
+                break;
+
+                case 3:
+                {
+                    for (int i = 0; i < length; i++)
+                    {
+                        width[length - i] = width[length - i - 1];
+                        height[length - i] = height[length - i - 1];
+                    }
+
+                    width[0] -= 20;
+
+                }
+                break;
+
+                case 4:
+                {
+                    for (int i = 0; i < length; i++)
+                    {
+                        width[length - i] = width[length - i - 1];
+                        height[length - i] = height[length - i - 1];
+                    }
+
+                    width[0] += 20;
+
+                }
+                break;
+                }
+
+                // << 창 좌표.
+                /*POINT center_up = { 10,10 };
+                POINT center_down = { 10,411 };
+                POINT center_left = { 10,10 };
+                POINT center_right = { 450,10 };*/
+
+                if (width[0] <= 10 || width[0] >= 450 || height[0] <= 10 || height[0] >= 410)
+                {
+                    checkCollision == Wall;
+
+                    cout << "벽과 충돌 ";
+                    KillTimer(hWnd, 1);
+                    KillTimer(hWnd, 2);
+
+                    TCHAR msg[40];
+                    TCHAR show[40];
+                    _stprintf_s(msg, _T("벽과 충돌했습니다."));
+                    _stprintf_s(show, _T("GameOver"));
+                    MessageBox(hWnd, msg, show, MB_OK);
+
+                    break;
+                }
+
+                if (width[0] == fx && height[0] == fy)
+                {
+                    cout << "먹이 먹음";
+
+                    KillTimer(hWnd, 1);
+                    KillTimer(hWnd, 2);
+                    //뱀의 머리위치와 먹이의 위치가 같으면?
+                    width[length + 1] = width[length];
+                    height[length + 1] = height[length];
+                    length++;
+                    //뱀의 꼬리가 하나 증가
+
+                    Food_Place(hWnd, rect, &fx, &fy);
+                    //먹이 위치 재배치
+
+                    KillTimer(hWnd, 2);
+                    SetTimer(hWnd, 2, 5000, NULL);
+                    //타이머 처음부터 다시발동
+
+
+                    InvalidateRgn(hWnd, NULL, TRUE);
+                    TCHAR msg[40];
+                    TCHAR show[40];
+                    _stprintf_s(msg, _T("먹이를 먹어 꼬리가 +1 증가하였습니다."));
+                    _stprintf_s(show, _T("현재 꼬리의 길이는 %d칸 입니다."), length + 1);
+                    MessageBox(hWnd, msg, show, MB_OK);
+                    //먹이를 먹었다는 메세지 표시
+                }
             }
             break;
 
-            case 2:
+            case 2: //2번 타이머.
             {
-                for (int i = 0; i < snakeLength; i++)
-                {
-                    snakeArr[i].x -= 10;
-                    snakeArr[i + 1].x -= 20;
-                }
-            
+                hdc = GetDC(hWnd);
+
+                Food_Place(hWnd, rect, &fx, &fy);
+                //먹이 좌표 재생성
+
+                ReleaseDC(hWnd, hdc);   
+
+                
             }
             break;
 
-            case 3:
-            {   
-                for (int i = 0; i < snakeLength; i++)
-                {
-                    snakeArr[i].y -= 10;
-                    snakeArr[i + 1].y -= 20;
-                }
             
-            }
-            break;
-
-            case 4:
-            {   
-                for (int i = 0; i < snakeLength; i++)
-                {
-                    snakeArr[i].y += 10;
-                    snakeArr[i + 1].y += 20;
-                }
-            
-            }
-            break;
-            }
-
-                //InvalidateRgn(hWnd, NULL, FALSE);//새 이벤트 불러오기
-            
-                InvalidateRgn(hWnd, NULL, true);//새 이벤트 불러오기
+        }
+       
+         
+            InvalidateRgn(hWnd, NULL, true);//새 이벤트 불러오기
         }
         break;
 
@@ -296,6 +424,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
         
+            //map 외곽.
             POINT center_up = { 10,10 };
             POINT center_down = { 10,411 };
             POINT center_left = { 10,10 };
@@ -320,9 +449,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 Rectangle(hdc, center_right.x - 10, center_right.y - 10, center_right.x + 10, center_right.y + 10);
                 center_right.y += 20;
-            }      
+            }              
 
-            Snake(hdc, 5);
+            Snake(hdc, width, height, length);
+            //뱀 그리기
+
+            Food_Draw(hdc, &fx, &fy);        
 
             //InvalidateRgn(hWnd, NULL, false);//새 이벤트 불러오기
                                    
@@ -332,6 +464,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         PostQuitMessage(0);
         KillTimer(hWnd, 1);
+        KillTimer(hWnd, 2);
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
@@ -366,64 +499,108 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 //강사님 팁.
 
-void Update()
+//void Update()
+//{
+//    //wsad
+//    // WM_keydown, WM_keyup -> 입력 키를 둔감하게 받을 때.
+//
+//    // 키 입력 받는게 예민하게 받을 때.
+//   
+//        if (GetKeyState('A') & 0x8000)
+//        {       
+//            for (int i = 0; i < 50; i++)
+//            {
+//                snakeCenter.x -= 10;
+//
+//                cout << snakeCenter.x;
+//            }
+//           
+//        }
+//
+//        if (GetKeyState('D') & 0x8000)
+//        {
+//            snakeCenter.x += 10;
+//
+//            for (int i = 0; i < 50; i++)
+//            {
+//                snakeCenter.x += 10;
+//
+//                cout << snakeCenter.x << " ";
+//            }
+//        }
+//
+//        if (GetKeyState('S') & 0x8000)
+//        {
+//            snakeCenter.y += 10;
+//        }
+//
+//        if (GetKeyState('W') & 0x8000)
+//        {
+//            snakeCenter.y -= 10;
+//        }
+//}
+
+void Draw_Circle(HDC hdc, int i)
 {
-    //wsad
-    // WM_keydown, WM_keyup -> 입력 키를 둔감하게 받을 때.
-
-    // 키 입력 받는게 예민하게 받을 때.
-   
-        if (GetKeyState('A') & 0x8000)
-        {       
-            for (int i = 0; i < 50; i++)
-            {
-                snakeCenter.x -= 10;
-
-                cout << snakeCenter.x;
-            }
-           
-        }
-
-        if (GetKeyState('D') & 0x8000)
-        {
-            snakeCenter.x += 10;
-
-            for (int i = 0; i < 50; i++)
-            {
-                snakeCenter.x += 10;
-
-                cout << snakeCenter.x << " ";
-            }
-        }
-
-        if (GetKeyState('S') & 0x8000)
-        {
-            snakeCenter.y += 10;
-        }
-
-        if (GetKeyState('W') & 0x8000)
-        {
-            snakeCenter.y -= 10;
-        }
+    Ellipse(hdc, snakeArr[i].x - 10, snakeArr[i].y - 10, snakeArr[i].x + 10, snakeArr[i].y + 10);
 }
 
-void Snake(HDC hdc, int length)
+
+
+//참고.
+void Init(HWND hWnd, int size) 
 {
-    for (int i = 0; i <= length; i++) 
-    {
-        if (i == 0) 
-        {
-            SelectObject(hdc, CreateSolidBrush(RGB(255, 0, 0)));
+    srand(time(NULL));
+    SetTimer(hWnd, 2, 5000, NULL);
+    //5초마다 1번 타이머가 WM_TIMER 발생
+}
+
+//void Outline(HWND hWnd, HDC hdc, RECT rect, int size) 
+//{
+//    //맵 표시
+//    int x = 10;
+//    int y = 30;
+//    TCHAR str[80];
+//
+//    _stprintf_s(str, _T("범위좌표 : (%d, %d) / (%d, %d)"), 20, 40, rect.right - rect.right % 20, rect.bottom - rect.bottom % 20);
+//    TextOut(hdc, 500, 0, str, _tcslen(str));
+//
+//    for (x = 10; x < rect.right; x += 20) 
+//    {
+//        Rectangle(hdc, x - size, y - size, x + size, y + size);
+//    }
+//    x = 10;
+//
+//    for (y = 30; y < rect.bottom; y += 20) 
+//    {
+//        Rectangle(hdc, x - size, y - size, x + size, y + size);
+//    }
+//    y -= 20;
+//
+//    for (x = 10; x < rect.right; x += 20) 
+//    {
+//        Rectangle(hdc, x - size, y - size, x + size, y + size);
+//    }
+//    x -= 20;
+//
+//    for (y = 30; y < rect.bottom; y += 20) 
+//    {
+//        Rectangle(hdc, x - size, y - size, x + size, y + size);
+//    }
+//}
+
+void Snake(HDC hdc, int* x, int* y, int length) 
+{
+    for (int i = 0; i <= length; i++) {
+        if (i == 0) {
+            SelectObject(hdc, CreateSolidBrush(RGB(210, 110, 30)));
             //처음 그리는 머리는 빨간색
         }
-        else 
-        {
-            SelectObject(hdc, CreateSolidBrush(RGB(0, 255, 0)));
+        else {
+            SelectObject(hdc, CreateSolidBrush(RGB(120, 100, 100)));
             //이후 그리는 몸은 녹색
-
-            cout << i << "개 ";
         }
-        Draw_Circle(hdc, i);
+        Ellipse(hdc, x[i] - 10, y[i] - 10, x[i] + 10, y[i] + 10);
     }
 
     /*SelectObject(hdc, CreateSolidBrush(RGB(255, 0, 0)));
@@ -432,8 +609,36 @@ void Snake(HDC hdc, int length)
     Ellipse(hdc, x2 - 10, y2 - 10, x2 + 10, y2 + 10);*/
 }
 
-void Draw_Circle(HDC hdc, int i)
+void Food_Place(HWND hWnd, RECT rect, int* fx, int* fy) 
 {
-    Ellipse(hdc, snakeArr[i].x - 10, snakeArr[i].y - 10, snakeArr[i].x + 10, snakeArr[i].y + 10);
+    int tmp;
+    do {
+        *fx = (rand() % rect.right);
+        tmp = *fx % 10;
+        *fx -= tmp;
+    } while (*fx % 20 != 10);
+    //먹이의 x좌표
+
+    do {
+        *fy = (rand() % rect.bottom);
+        tmp = *fy % 10;
+        *fy -= tmp;
+    } while (*fy % 20 != 10);
+    //먹이의 y좌표
+    //영역 내 먹이를 표시해야 한다. 뱀의 좌표와 일치하기 위해서는 항상 20의 간격을 유지해야 한다.
+
+    InvalidateRgn(hWnd, NULL, TRUE);
 }
+
+void Food_Draw(HDC hdc, int* fx, int* fy) 
+{
+    TCHAR tmp[20];
+    _stprintf_s(tmp, _T("먹이좌표 : [%d, %d]"), *fx, *fy);
+    TextOut(hdc, 20, 0, tmp, _tcslen(tmp));
+
+    SelectObject(hdc, CreateSolidBrush(RGB(0, 0, 255)));
+    //먹이를 먹었을 경우 파란색으로 다시 그린다.
+    Rectangle(hdc, *fx - 10, *fy - 10, *fx + 10, *fy + 10);
+}
+
 
